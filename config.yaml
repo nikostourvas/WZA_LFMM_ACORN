@@ -9,17 +9,11 @@ samples:
 
 # List of envfactor names
 envfactor_names: ["bio9", "bio12"]
-#envfactor_names: ["hillshade", "aspect.eastness", "aspect.northness", "topographic.exposure", "horizontal.curvature", "vertical.curvature", "vrm", "wetness.index.dinf", "diffus.solar.radiation", "direct.solar.radiation", "total.solar.radiation", "bio1", "bio2", "bio3", "bio4", "bio5", "bio6", "bio7", "bio8", "bio9", "bio10", "bio11", "bio12", "bio13", "bio14", "bio15", "bio16", "bio17", "bio18", "bio19", "slope.degrees"]
+#envfactor_names: ["hillshade", "aspect.eastness", "aspect.northness", "topographic.exposure", "horizontal.curvature", "vertical.curvature", "vrm", "wetness.index.dinf", "diffus.solar.radiation.method.1", "direct.solar.radiation.method.1", "total.solar.radiation.method.1", "bio1", "bio2", "bio3", "bio4", "bio5", "bio6", "bio7", "bio8", "bio9", "bio10", "bio11", "bio12", "bio13", "bio14", "bio15", "bio16", "bio17", "bio18", "bio19", "slope.degrees"]
 #envfactor_names: ["bio6"]
-
-# Paths to the environmental factors and poolsizes files
-input_files:
-  envfactors: "data/20240915_ACORN_dem_TOPO_by_POP_NT.csv"
-  poolsizes: "data/20240307_poolsizes_per_pop.csv"
 
 # Parameters for the analysis
 parameters:
-  min_haploid_pool_size: 15  # Minimum haploid pool size
   WZA_window_size: 10000  # Window size for the WZA
   WZA_fdr: 0.05  # False discovery rate for the WZA
 
@@ -32,7 +26,15 @@ resources:
     runtime: 10
     mem_mb: 1000
     slurm_partition: "testing"
-  prepare_WZA:
+  gather_pvalues:
+    runtime: 40
+    mem_mb: 8000
+    slurm_partition: "batch"
+  merge_tmp_files:
+    runtime: 40
+    mem_mb: 8000
+    slurm_partition: "batch"
+  prepare_WZA_input:
     runtime: 40
     mem_mb: 8000
     slurm_partition: "batch"

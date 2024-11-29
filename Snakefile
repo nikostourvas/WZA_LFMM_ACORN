@@ -13,24 +13,12 @@ SAMPLES = config["samples"]
 # Get list of environment factors from config file
 ENVFACTOR_NAMES = config["envfactor_names"]
 
-# Get input file names from config file
-ENVFACTORS = config["input_files"]["envfactors"]
-
 # Get parameters from config file
 WZA_WINDOW_SIZE = config["parameters"]["WZA_window_size"]
 WZA_FDR = config["parameters"]["WZA_fdr"]
 
 # Get resources from config file
 RESOURCES = config["resources"]
-
-# function to calculate the number of populations
-import os
-
-def count_words_in_file(file_path):
-    with open(file_path, 'r') as file:
-        content = file.read()
-    return len(content.split())
-
 
 rule all:
     input:
@@ -47,21 +35,33 @@ rule all:
 # It processes LFMM result files for each environmental factor, extracts the relevant columns,
 # removes headers, adds new headers with the environmental factor names,
 # and merges the temporary CSV files into a single file for each sample.
-rule prepare_WZA:
+rule gather_pvalues:
     resources:
-        runtime=RESOURCES["prepare_WZA"]["runtime"],
-        mem_mb=RESOURCES["prepare_WZA"]["mem_mb"],
-        slurm_partition=RESOURCES["prepare_WZA"]["slurm_partition"]
+        runtime=RESOURCES["gather_pvalues"]["runtime"],
+        mem_mb=RESOURCES["gather_pvalues"]["mem_mb"],
+        slurm_partition=RESOURCES["gather_pvalues"]["slurm_partition"]
     output:
         WZA_pre_input = temp("res/{sample}/tmp_{envfactor}.csv"),
     shell:
         """
-        for file in res/*/Full_analysis_K_1/environment_{wildcards.envfactor}/LFMM_AllResults_env_{wildcards.envfactor}_K1.csv; do
+        for file in res/{wildcards.sample}/Full_analysis_K_1/environment_{wildcards.envfactor}/LFMM_AllResults_env_{wildcards.envfactor}_K1.csv; do
             cut -d',' -f3 $file \
                     | sed '1d' \
                     | sed '1i {wildcards.envfactor}' > {output.WZA_pre_input}
         done
-    
+        """
+
+rule merge_tmp_files:
+    input:
+        expand("res/{sample}/tmp_{envfactor}.csv", sample=SAMPLES, envfactor=ENVFACTOR_NAMES),
+    output:
+        merged_tmp = temp("res/{sample}/merged_tmp.csv"),
+    resources:
+        runtime=RESOURCES["merge_tmp_files"]["runtime"],
+        mem_mb=RESOURCES["merge_tmp_files"]["mem_mb"],
+        slurm_partition=RESOURCES["merge_tmp_files"]["slurm_partition"]
+    shell:
+        """
         paste -d',' res/{wildcards.sample}/tmp_*.csv > res/{wildcards.sample}/merged_tmp.csv
         """
 
@@ -69,13 +69,18 @@ rule prepare_WZA:
 # It extracts the chromosome and position columns from the Allele Frequency Table,
 # calculates the mean MAF (Minor Allele Frequency) for each SNP,
 # and generates the input file for the WZA analysis by combining the chromosome, position, MAF, and merged LFMM results.
-rule prepare_WZA_2:
+rule prepare_WZA_input:
     input:
         frequency_table = "dat/{sample}_AlleleFrequencyTable.txt",
+        merged_tmp = "res/{sample}/merged_tmp.csv",
     params:
         window_size = WZA_WINDOW_SIZE,
     output:
         WZA_input = "dat/WZA/{sample}_WZA_input.csv",
+    resources:
+        runtime=RESOURCES["prepare_WZA_input"]["runtime"],
+        mem_mb=RESOURCES["prepare_WZA_input"]["mem_mb"],
+        slurm_partition=RESOURCES["prepare_WZA_input"]["slurm_partition"]
     shell:
         """
         cut -d'\t' -f1 {input.frequency_table} \
@@ -88,7 +93,6 @@ rule prepare_WZA_2:
         paste -d',' res/{wildcards.sample}/CHR_POS.csv res/{wildcards.sample}/merged_tmp.csv res/{wildcards.sample}/tmpMAF.csv \
             | awk -f scripts/Make_Genomic_Windows.sh -v window_size={params.window_size} > {output.WZA_input}
 
-        rm res/{wildcards.sample}/merged_tmp.csv
         rm res/{wildcards.sample}/tmpMAF.csv
         rm res/{wildcards.sample}/CHR_POS.csv
         """
