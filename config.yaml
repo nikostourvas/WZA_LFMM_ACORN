@@ -1,0 +1,46 @@
+# Path to the Singularity container
+singularity: "/home/nikos/other_apps/bin/poolseq_tools_0.2.11.sif"
+#singularity: "/mnt/forgenet_a/container_images/poolseq_tools_0.2.10.sif"
+#singularity: "/home/geneticsShare/container_images/poolseq_tools_0.2.12.sif"
+
+# List of sample names
+samples:
+  - ACORN_VCF_Qrobur_test
+
+# List of envfactor names
+envfactor_names: ["bio9", "bio12"]
+#envfactor_names: ["hillshade", "aspect.eastness", "aspect.northness", "topographic.exposure", "horizontal.curvature", "vertical.curvature", "vrm", "wetness.index.dinf", "diffus.solar.radiation", "direct.solar.radiation", "total.solar.radiation", "bio1", "bio2", "bio3", "bio4", "bio5", "bio6", "bio7", "bio8", "bio9", "bio10", "bio11", "bio12", "bio13", "bio14", "bio15", "bio16", "bio17", "bio18", "bio19", "slope.degrees"]
+#envfactor_names: ["bio6"]
+
+# Paths to the environmental factors and poolsizes files
+input_files:
+  envfactors: "data/20240915_ACORN_dem_TOPO_by_POP_NT.csv"
+  poolsizes: "data/20240307_poolsizes_per_pop.csv"
+
+# Parameters for the analysis
+parameters:
+  min_haploid_pool_size: 15  # Minimum haploid pool size
+  WZA_window_size: 10000  # Window size for the WZA
+  WZA_fdr: 0.05  # False discovery rate for the WZA
+
+
+# Set resources settings for each rule
+# This is only useful if you are running the pipeline on a HPC cluster
+# If not, you can ignore this section
+resources:
+  all:
+    runtime: 10
+    mem_mb: 1000
+    slurm_partition: "testing"
+  prepare_WZA:
+    runtime: 40
+    mem_mb: 8000
+    slurm_partition: "batch"
+  WZA:
+    runtime: 60
+    mem_mb: 100000
+    slurm_partition: "batch"
+  WZA_diagnostics:
+    runtime: 30
+    mem_mb: 8000
+    slurm_partition: "batch"
