@@ -82,7 +82,8 @@ rule prepare_WZA_input:
         slurm_partition=RESOURCES["prepare_WZA_input"]["slurm_partition"]
     shell:
         """
-        cut -d'\t' -f1 {input.frequency_table} \
+        sed 's/H2.3_/H2.3-/' {input.frequency_table} \
+            | cut -d'\t' -f1 \
             | awk -F'_' 'BEGIN{{OFS=","}} {{print $1, $2, $3}}' \
             | cut -d',' -f2,3 \
             | sed '1d' | sed '1i CHR,POS' > "res/{wildcards.sample}/CHR_POS.csv"
@@ -105,7 +106,7 @@ rule WZA:
         mem_mb=RESOURCES["WZA"]["mem_mb"],
         slurm_partition=RESOURCES["WZA"]["slurm_partition"]
     output:
-        WZA_output = temp("res/WZA_res/{sample}_{envfactor}_WZA_output.csv"),
+        WZA_output = protected("res/WZA_res/{sample}_{envfactor}_WZA_output.csv"),
     shell:
         """
         python3 scripts/general_WZA_script.py \
