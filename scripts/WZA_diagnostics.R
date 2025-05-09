@@ -35,41 +35,78 @@ for (i in envfactors){
 
 print("Calculating q-values")
 # FDR correction
-WZA_res = lapply(WZA_res, function(x) {x$qvalue = qvalue(x$Z_pVal, fdr.level=FDR_LEVEL)$significant; return(x)})
-WZA_res = lapply(WZA_res, function(x) {x$qvalue0.001 = qvalue(x$Z_pVal, fdr.level=0.001)$significant; return(x)})
-WZA_res = lapply(WZA_res, function(x) {x$qvalue_gif_adj = qvalue(x$Z_pVal_gif_adj, fdr.level=FDR_LEVEL)$significant; return(x)})
-WZA_res = lapply(WZA_res, function(x) {x$qvalue0.001_gif_adj = qvalue(x$Z_pVal_gif_adj, fdr.level=0.001)$significant; return(x)})
+WZA_res = lapply(WZA_res, function(x) {x$qvalue = qvalue(x$Z_pVal, fdr.level=FDR_LEVEL)$qvalues; return(x)})
+WZA_res = lapply(WZA_res, function(x) {x$qvalue_gif_adj = qvalue(x$Z_pVal_gif_adj, fdr.level=FDR_LEVEL)$qvalues; return(x)})
+
+# manipulate the index names to match the output from BayPass
+WZA_res = lapply(WZA_res, function(x) {x$index = gsub("H2.3-Sc", "Qrob_H2.3.Sc", x$index); return(x)})
+WZA_res = lapply(WZA_res, function(x) {x$index = gsub("Chr0", "", x$index); return(x)})
+WZA_res = lapply(WZA_res, function(x) {x$index = gsub("Chr", "", x$index); return(x)})
+
 # export each table to a file
 for (i in envfactors){
   write.table(WZA_res[[i]], file=paste0(snakemake@params[[1]], i, "_WZA_output_fdr.csv"), 
               sep=",", row.names=FALSE, quote=FALSE)
 }
 
-WZA_res = lapply(WZA_res, function(x) x[ ,c(1,2,6,7,8,9,10,11,12)]) # keep only the columns we need for plotting
-WZA_res = reshape2::melt(WZA_res, id.vars = c("index", "SNPs", "POS"))
+############################
+# Find significant windows
+############################
+
+WZA_res = lapply(WZA_res, function(x) x[ ,c(1,6,7,8,9,10)]) # keep only the columns we need for plotting
+WZA_res = reshape2::melt(WZA_res, id.vars = c("index", "POS"))
 # Make the dataset wide. Spread the "variable" column into multiple columns
 WZA_res = spread(WZA_res, variable, value)
-WZA_res$qvalue = as.logical(WZA_res$qvalue)
-WZA_res$qvalue0.001 = as.logical(WZA_res$qvalue0.001)
-WZA_res$qvalue_gif_adj = as.logical(WZA_res$qvalue_gif_adj)
-WZA_res$qvalue0.001_gif_adj = as.logical(WZA_res$qvalue0.001_gif_adj)
+print(head(WZA_res))
 
-WZA_res$index = as.factor(gsub("Qrob_Chr", "", WZA_res$index)) # remove prefix from chr names
-WZA_res$index = as.factor(gsub("Sc0000", "", WZA_res$index)) # remove prefix from chromosome names
+print("string manipulation")
 # remove from rows of the column WZA_res$index the suffix "_window_" and anything after that
-WZA_res$index = as.factor(gsub("_window_.*", "", WZA_res$index))
+WZA_res$CHR = as.factor(gsub("_window_.*", "", WZA_res$index))
 
-colnames(WZA_res) = c("CHR", "SNPs", "POS", "envfactor", 
+colnames(WZA_res) = c("index", "POS", "envfactor", 
                       "pvalue", "gif_cor_pvalue", 
-                      "qvalue", "qvalue0.001", "qvalue_gif_adj", "qvalue0.001_gif_adj")
-write.table(WZA_res, file=paste0(snakemake@params[[1]], "WZA_test.csv"), sep=",", row.names=FALSE, quote=FALSE)
+                      "qvalue", "qvalue_gif_adj", "CHR")
+#write.table(WZA_res, file=paste0(snakemake@params[[1]], "WZA_test.csv"), sep=",", row.names=FALSE, quote=FALSE)
 
-WZA_res$CHR = as.factor(gsub("^0", "", WZA_res$CHR)) # replace 01, 02 etc with 1, 2 etc
 WZA_res$CHR = factor(WZA_res$CHR, levels=unique(WZA_res$CHR))
+
+print("Finding significant windows")
+WZA_q0.1 = WZA_res[WZA_res$qvalue_gif_adj < 0.1,]
+fwrite(WZA_q0.1, snakemake@output[[3]])
+
+WZA_q0.01 = WZA_res[WZA_res$qvalue_gif_adj < 0.01,]
+fwrite(WZA_q0.01, snakemake@output[[4]])
+
+WZA_q0.001 = WZA_res[WZA_res$qvalue_gif_adj < 0.001,]
+fwrite(WZA_q0.001, snakemake@output[[5]])
+
+# Make sure the data set is a data.table
+WZA_res = as.data.table(WZA_res)
+# The following filters should be applied separately for each environmental factor
+WZA_top0.1 = WZA_res[, .SD[pvalue < quantile(pvalue, 0.1)], by = envfactor]
+fwrite(WZA_top0.1, snakemake@output[[6]])
+
+WZA_top0.01 = WZA_res[, .SD[pvalue < quantile(pvalue, 0.01)], by = envfactor]
+fwrite(WZA_top0.01, snakemake@output[[7]])
+
+WZA_top0.001 = WZA_res[, .SD[pvalue < quantile(pvalue, 0.001)], by = envfactor]
+fwrite(WZA_top0.001, snakemake@output[[8]])
 
 ############################
 # Manhattan plots
 ############################
+print("Creating Manhattan plots")
+
+# Sort the CHR column properly
+# First remove prefixes from contig names
+WZA_res$CHR = gsub("^Qrob_H2.3.Sc00000", "", WZA_res$CHR)
+WZA_res$CHR = gsub("^Qrob_H2.3.Sc0000", "", WZA_res$CHR)
+# Then convert to numeric
+WZA_res$CHR = as.integer(WZA_res$CHR)
+# Then convert back to factor with properly sorted levels
+# If I don't do this, scale_color_manual will not work properly
+WZA_res$CHR = factor(WZA_res$CHR, levels=as.character(sort(unique(WZA_res$CHR))))
+print(unique(WZA_res$CHR))
 
 # add a column with the calculated -log10(p-value)
 WZA_res$score = -log10(WZA_res$gif_cor_pvalue)

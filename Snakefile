@@ -22,7 +22,7 @@ RESOURCES = config["resources"]
 
 rule all:
     input:
-        expand("res/{sample}/tmp_{envfactor}.csv", sample=SAMPLES, envfactor=ENVFACTOR_NAMES),
+        #expand("res/{sample}/tmp_{envfactor}.csv", sample=SAMPLES, envfactor=ENVFACTOR_NAMES),
         expand("res/WZA_res/{sample}_WZA_manhattan_plots.png", sample=SAMPLES),
         expand("res/WZA_res/{sample}_{envfactor}_WZA_output_fdr.csv", sample=SAMPLES, envfactor=ENVFACTOR_NAMES)
     resources:
@@ -75,7 +75,7 @@ rule prepare_WZA_input:
     params:
         window_size = WZA_WINDOW_SIZE,
     output:
-        WZA_input = temp("dat/WZA/{sample}_WZA_input.csv"),
+        WZA_input = "dat/WZA/{sample}_WZA_input.csv",
     resources:
         runtime=RESOURCES["prepare_WZA_input"]["runtime"],
         mem_mb=RESOURCES["prepare_WZA_input"]["mem_mb"],
@@ -106,7 +106,7 @@ rule WZA:
         mem_mb=RESOURCES["WZA"]["mem_mb"],
         slurm_partition=RESOURCES["WZA"]["slurm_partition"]
     output:
-        WZA_output = protected("res/WZA_res/{sample}_{envfactor}_WZA_output.csv"),
+        WZA_output = "res/WZA_res/{sample}_{envfactor}_WZA_output.csv",
     shell:
         """
         python3 scripts/general_WZA_script.py \
@@ -135,5 +135,11 @@ rule WZA_diagnostics:
     output:
         WZA_manhattan_plots = "res/WZA_res/{sample}_WZA_manhattan_plots.png",
         WZA_manhattan_plots_wo_GIF = "res/WZA_res/{sample}_WZA_manhattan_plots_wo_GIF.png",
-        WZA_output_fdr = protected(expand("res/WZA_res/{{sample}}_{envfactor}_WZA_output_fdr.csv", envfactor=ENVFACTOR_NAMES))
+        WZA_q_0_1 = "res/WZA_res/{sample}_significant_windows_LFMM_q0.1.csv",
+        WZA_q_0_01 = "res/WZA_res/{sample}_significant_windows_LFMM_q0.01.csv",
+        WZA_q_0_001 = "res/WZA_res/{sample}_significant_windows_LFMM_q0.001.csv",
+        WZA_top_0_1 = "res/WZA_res/{sample}_significant_windows_LFMM_top0.1.csv",
+        WZA_top_0_01 = "res/WZA_res/{sample}_significant_windows_LFMM_top0.01.csv",
+        WZA_top_0_001 = "res/WZA_res/{sample}_significant_windows_LFMM_top0.001.csv",
+        WZA_output_fdr = expand("res/WZA_res/{{sample}}_{envfactor}_WZA_output_fdr.csv", envfactor=ENVFACTOR_NAMES)
     script: "scripts/WZA_diagnostics.R"
